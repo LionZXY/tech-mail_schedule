@@ -1,21 +1,23 @@
 package ru.mail.tp.schedule.schedule;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
 import ru.mail.tp.schedule.schedule.db.entities.Discipline;
 import ru.mail.tp.schedule.schedule.db.entities.LessonType;
 import ru.mail.tp.schedule.schedule.db.entities.Place;
-import ru.mail.tp.schedule.schedule.db.entities.PlaceType;
 import ru.mail.tp.schedule.schedule.db.entities.ScheduleItem;
 import ru.mail.tp.schedule.schedule.db.entities.Subgroup;
+import ru.mail.tp.schedule.schedule.parser.GroupExtractProcessor;
 import ru.mail.tp.schedule.utils.StringHelper;
 
 
@@ -24,68 +26,36 @@ import ru.mail.tp.schedule.utils.StringHelper;
  * date: 04.07.14
  */
 public class ScheduleJSONProcessor {
-    private final HashMap<String, Place> auditoriums = new HashMap<String, Place>();
-    private final HashMap<String, Place> places = new HashMap<String, Place>();
+    private final Map<String, Place> auditoriums;
+    private final Map<String, Place> places;
 
-    private final HashMap<String, Subgroup> subgroups = new HashMap<String, Subgroup>();
-    private final HashMap<String, Discipline> disciplines = new HashMap<String, Discipline>();
-    private final HashMap<String, LessonType> lessonTypes = new HashMap<String, LessonType>();
+    private final Map<String, Subgroup> subgroups;
+    private final Map<String, Discipline> disciplines;
+    private final Map<String, LessonType> lessonTypes;
 
-    private JSONObject timetable;
+    private JSONArray timetable;
 
     public ScheduleJSONProcessor(JSONObject json) throws JSONException {
-        Iterator<?> keys;
-        JSONObject auditoriums = json.getJSONObject("auditoriums");
-        JSONObject places = json.getJSONObject("places");
-        JSONObject types = json.getJSONObject("types");
-        JSONObject subgroups = json.getJSONObject("groups");
-        JSONObject disciplines = json.getJSONObject("disciplines");
-
-        keys = auditoriums.keys();
-        while (keys.hasNext()) {
-            String key = (String) keys.next();
-            this.auditoriums.put(key, new Place(key, PlaceType.AUDITORY, auditoriums.getString(key)));
+        final JSONArray schedule = json.getJSONArray("aSchedule");
+        final List<JSONObject> events = new ArrayList<>();
+        for (int i = 0; i < schedule.length(); i++) {
+            JSONObject event = (JSONObject) schedule.get(i);
+            events.add(event);
         }
 
-        keys = places.keys();
-        while (keys.hasNext()) {
-            String key = (String) keys.next();
-            this.places.put(key, new Place(key, PlaceType.PLACE, places.getString(key)));
-        }
+        auditoriums = GroupExtractProcessor.getAuditoriums(events);
+        places = GroupExtractProcessor.getPlaces(events);
+        subgroups = GroupExtractProcessor.getSubgrops(events);
+        disciplines = GroupExtractProcessor.getDisciplines(events);
+        lessonTypes = GroupExtractProcessor.getLessons(events);
 
-        keys = types.keys();
-        while (keys.hasNext()) {
-            String key = (String) keys.next();
-            this.lessonTypes.put(key, new LessonType(key, types.getString(key)));
-        }
-
-        keys = subgroups.keys();
-        while (keys.hasNext()) {
-            String key = (String) keys.next();
-            this.subgroups.put(key, new Subgroup(key, subgroups.getString(key)));
-        }
-
-        keys = disciplines.keys();
-        while (keys.hasNext()) {
-            String key = (String) keys.next();
-            JSONObject discipline = disciplines.getJSONObject(key);
-            this.disciplines.put(key, new Discipline(
-                    key,
-                    StringHelper.quotesFormat(discipline.getString("long_name")),
-                    StringHelper.quotesFormat(discipline.getString("short_name"))
-            ));
-        }
-
-        this.timetable = json.getJSONObject("timetable");
+        this.timetable = schedule;
     }
 
     public ArrayList<ScheduleItem> getScheduleItems() throws JSONException {
-        ArrayList<ScheduleItem> result = new ArrayList<ScheduleItem>();
-
-        Iterator<?> keys = this.timetable.keys();
-        while (keys.hasNext()) {
-            String key = (String) keys.next();
-            JSONObject item = this.timetable.getJSONObject(key);
+        ArrayList<ScheduleItem> result = new ArrayList<>();
+        for(int i = 0; i < timetable.length(); i++) {
+            JSONObject item = this.timetable.getJSONObject(i);
             result.add(this.getScheduleItemFromJSON(item));
         }
 
@@ -104,37 +74,34 @@ public class ScheduleJSONProcessor {
 
     private ScheduleItem getScheduleItemFromJSON(JSONObject item) throws JSONException {
         int id = item.getInt("id");
-        long timeStart = item.getLong("time_start");
-        long timeEnd = item.getLong("time_end");
+        long timeStart = item.getLong("start");
+        long timeEnd = item.getLong("end");
         String title;
 
-        String eventType = item.getString("event");
+        String eventType = item.getString("type_entity");
         if (eventType.equals("event")) {
             title = StringHelper.quotesFormat(item.getString("title"));
             Place place = null;
-            String placeId = item.getString("place");
-            String auditoriumId = item.getString("auditorium");
-            if (!placeId.equals("0")) {
-                place = this.places.get(placeId);
-            } else if (!auditoriumId.equals("0")) {
-                place = this.auditoriums.get(auditoriumId);
+            try {
+                place = places.get(item.getString("place_title"));
+            } catch (JSONException e) {
+                place = auditoriums.get(item.getString("auditorium_number"));
             }
             return new ScheduleItem(id, timeStart, timeEnd, title, place);
         } else if (eventType.equals("lesson")) {
-            Discipline discipline = this.disciplines.get(item.getString("discipline"));
-            LessonType lessonType = this.lessonTypes.get(item.getString("type"));
+            Discipline discipline = this.disciplines.get(item.getString("short_title"));
+            LessonType lessonType = this.lessonTypes.get(item.getString("event_title"));
             int number = item.getInt("number");
 
-            JSONObject subgroupsIds = item.getJSONObject("subgroups");
+            JSONArray subgroupsIds = item.getJSONArray("subgroups");
             ArrayList<Subgroup> subgroups = new ArrayList<>();
-            Iterator<?> keys = subgroupsIds.keys();
-
             HashSet<String> uniqueIds = new HashSet<>(); //фиксит баг в API (дублирующиеся id учебных групп), временный костыль
-            while (keys.hasNext()) {
-                String subgroupId = subgroupsIds.getString((String) keys.next());
-                if (!uniqueIds.contains(subgroupId)) {
-                    uniqueIds.add(subgroupId);
-                    Subgroup subgroup = this.subgroups.get(subgroupId);
+
+            for (int i = 0; i < subgroupsIds.length(); i++) {
+                final String key = (String) subgroupsIds.get(i);
+                if (!uniqueIds.contains(key)) {
+                    uniqueIds.add(key);
+                    Subgroup subgroup = this.subgroups.get(key);
                     if (subgroup != null) {
                         subgroups.add(subgroup);
                     }
@@ -142,9 +109,10 @@ public class ScheduleJSONProcessor {
             }
 
             Place place = null;
-            String auditoriumId = item.getString("auditorium");
-            if (!auditoriumId.equals("0")) {
-                place = this.auditoriums.get(auditoriumId);
+            try {
+                place = places.get(item.getString("place_title"));
+            } catch (JSONException e) {
+                place = auditoriums.get(item.getString("auditorium_number"));
             }
 
             return new ScheduleItem(id, timeStart, timeEnd, place, subgroups, discipline, lessonType, number);

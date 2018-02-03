@@ -38,7 +38,7 @@
             android:background="@color/light_gray"/>
 
     <fragment
-            android:name="ru.mail.tp.schedule.fragments.ScheduleDetailFragment"
+            android:name="ru.mail.tp.ru.mail.tp.schedule.schedule.fragments.ScheduleDetailFragment"
             android:id="@+id/a_schedule__frameLayout_detail"
             android:layout_width="0dp"
             android:layout_height="match_parent"

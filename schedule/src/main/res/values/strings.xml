@@ -10,13 +10,13 @@
     <string name="today">Сегодня</string>
     <string name="zeroTime">00:00–00:00</string>
     <string name="logo">Логотип Технопарка</string>
-    <string name="schedule">Расписание</string>
+    <string name="ru.mail.tp.schedule.schedule">Расписание</string>
     <string name="weCantGetData">Мы не смогли получить данные</string>
     <string name="tryAgain">Попробовать ещё</string>
     <string name="exit">Выход</string>
     <string name="connectionError">Ошибка соединения</string>
     <string name="showPast">Отображать прошедшие занятия</string>
-    <string name="dataSourceUrl">http://tptt.ozhegov.name/</string>
+    <string name="dataSourceUrl" formatted="false">https://park.mail.ru/ru.mail.tp.schedule.schedule/calendar/?start=0&amp;end=%1$d&amp;filter[subgroup_id][]=all&amp;filter[type_id][]=all&amp;filter[discipline_id][]=all&amp;&amp;withCustomEvents=false&amp;to_csv=false&amp;interval=semester</string>
 
     <string name="opened">Drawer opened</string>
     <string name="closed">Drawer closed</string>

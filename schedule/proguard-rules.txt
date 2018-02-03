@@ -4,7 +4,7 @@
 -dontpreverify
 -verbose
 
--keep class ru.mail.tp.schedule.**
+-keep class ru.mail.tp.ru.mail.tp.schedule.schedule.**
 -keep class com.actionbarsherlock.**
 
 -dontwarn com.actionbarsherlock.internal.**
